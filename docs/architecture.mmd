@@ -1,0 +1,52 @@
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Backend
+    participant Claude
+    participant GoogleCalendar
+    participant Database
+
+    Note over User,Database: Authentication Flow
+    User->>Frontend: Click "Sign in with Google"
+    Frontend->>Backend: GET /auth/google/login
+    Backend-->>Frontend: Return auth_url
+    Frontend->>GoogleCalendar: Redirect to Google OAuth
+    GoogleCalendar->>User: Request permissions
+    User->>GoogleCalendar: Grant permissions
+    GoogleCalendar->>Backend: Callback with auth code
+    Backend->>GoogleCalendar: Exchange code for tokens
+    GoogleCalendar-->>Backend: Return access & refresh tokens
+    Backend->>Database: Store encrypted tokens
+    Backend->>Database: Create/update user
+    Backend-->>Frontend: Redirect with JWT token
+    Frontend->>Frontend: Store JWT in localStorage
+
+    Note over User,Database: Scheduling Flow
+    User->>Frontend: Enter natural language request
+    Frontend->>Backend: POST /api/parse-intent
+    Backend->>Claude: Send prompt for intent extraction
+    Claude-->>Backend: Return structured JSON
+    Backend->>Database: Create meeting record (status: proposed)
+    Backend-->>Frontend: Return intent data
+    
+    Frontend->>Backend: POST /api/propose-slots
+    Backend->>GoogleCalendar: Query FreeBusy API
+    GoogleCalendar-->>Backend: Return busy periods
+    Backend->>Backend: Find free slots & rank
+    Backend-->>Frontend: Return 2-3 proposed slots
+    
+    User->>Frontend: Select preferred slot
+    Frontend->>Backend: POST /api/create-event
+    Backend->>GoogleCalendar: Create event with attendees
+    GoogleCalendar-->>Backend: Return event details
+    Backend->>Database: Update meeting (status: confirmed)
+    Backend-->>Frontend: Return event_id & calendar_link
+    Frontend->>User: Show success message
+
+    Note over User,Database: History Flow
+    User->>Frontend: Navigate to /meetings
+    Frontend->>Backend: GET /api/meetings/history
+    Backend->>Database: Query user's meetings
+    Database-->>Backend: Return meeting records
+    Backend-->>Frontend: Return meetings list
+    Frontend->>User: Display meeting history
